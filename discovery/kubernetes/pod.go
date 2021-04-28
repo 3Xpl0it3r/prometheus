@@ -149,6 +149,7 @@ const (
 	podContainerPortNameLabel     = metaLabelPrefix + "pod_container_port_name"
 	podContainerPortNumberLabel   = metaLabelPrefix + "pod_container_port_number"
 	podContainerPortProtocolLabel = metaLabelPrefix + "pod_container_port_protocol"
+	podContainerIdLabel 		= metaLabelPrefix + "pod_container_id"
 	podContainerIsInit            = metaLabelPrefix + "pod_container_init"
 	podReadyLabel                 = metaLabelPrefix + "pod_ready"
 	podPhaseLabel                 = metaLabelPrefix + "pod_phase"
@@ -183,6 +184,11 @@ func podLabels(pod *apiv1.Pod) model.LabelSet {
 		podNodeNameLabel: lv(pod.Spec.NodeName),
 		podHostIPLabel:   lv(pod.Status.HostIP),
 		podUID:           lv(string(pod.ObjectMeta.UID)),
+	}
+	// added docker container id
+	dockerId := podContainerId(pod)
+	if dockerId != ""{
+		ls[podContainerIdLabel] = lv(dockerId)
 	}
 
 	createdBy := GetControllerOf(pod)
@@ -272,4 +278,31 @@ func podReady(pod *apiv1.Pod) model.LabelValue {
 		}
 	}
 	return lv(strings.ToLower(string(apiv1.ConditionUnknown)))
+}
+
+
+func podContainerId(pod *apiv1.Pod) string{
+	// get one of containers is ok
+	if pod == nil{
+		return ""
+	}
+	// get container name, select the first one
+	var (
+		containerName string = ""
+
+	)
+	for _, container := range pod.Spec.Containers{
+		if container.Name != ""{
+			containerName = container.Name
+			break
+		}
+	}
+	// get container id
+	for _,containerSts := range pod.Status.ContainerStatuses{
+		if containerSts.Name == containerName{
+			containerIdSlice := strings.Split(containerSts.ContainerID, "docker://")
+			return containerIdSlice[len(containerIdSlice)-1]
+		}
+	}
+	return ""
 }
